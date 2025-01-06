@@ -3,138 +3,155 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Phone Number Search</title>
-    <!-- Include Chakra UI Styles -->
-    <link rel="stylesheet" href="https://unpkg.com/@chakra-ui/react@2.6.1/dist/chakra-ui.css">
+    <title>Phone Search</title>
+    <script src="https://cdn.jsdelivr.net/npm/@chakra-ui/core@1.1.0/dist/chakra-ui.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
-            padding: 20px;
-            background-color: #f7f7f7;
         }
-        .search-container {
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: white;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        }
-        .results-table {
-            width: 100%;
+        .loading {
+            display: none;
+            text-align: center;
             margin-top: 20px;
+        }
+        .result-panel {
+            display: none;
+            margin-top: 20px;
+        }
+        table {
+            width: 100%;
             border-collapse: collapse;
         }
-        .results-table th, .results-table td {
-            padding: 10px;
+        th, td {
             border: 1px solid #ddd;
-        }
-        .results-table th {
-            background-color: #4CAF50;
-            color: white;
+            padding: 8px;
+            text-align: left;
         }
     </style>
 </head>
 <body>
 
-    <div class="search-container">
-        <h2>Search Phone Number</h2>
-        <input type="text" id="phoneNumber" placeholder="Enter Phone Number" style="padding: 10px; width: 100%; margin-bottom: 10px;">
-        <button onclick="searchPhoneNumber()" style="padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">
-            Search
-        </button>
-        <div id="loadingMessage" style="display:none; margin-top: 20px; color: #007bff;">
-            Searching... please wait.
-        </div>
-        <table class="results-table" id="resultsTable" style="display:none;">
-            <thead>
-                <tr>
-                    <th>Ticket ID</th>
-                    <th>User ID</th>
-                    <th>Phone Number</th>
-                    <th>Lender ID</th>
-                    <th>Lender Name</th>
-                    <th>Payout Amount</th>
-                    <th>Payout Date</th>
-                    <th>Beneficiary Account Name</th>
-                    <th>Beneficiary Account Number</th>
-                    <th>IFSC Code</th>
-                    <th>Remark</th>
-                    <th>UTR's New</th>
-                    <th>FD Status</th>
-                    <th>Reason</th>
-                </tr>
-            </thead>
-            <tbody id="resultsBody">
-            </tbody>
-        </table>
-    </div>
+    <div id="app"></div>
 
     <script>
-        const SHEET_ID = '1VLljXHe4ZRTVhvGyPBp_149COUU0YxoVvDAXuFNkJ7U'; // Your Google Sheet ID
-        const API_KEY = 'AIzaSyCNqt-KUnlTgKP8FSpow_8ZXgdMmMX5QX4';  // Your Google API Key
-        const RANGE = 'Sheet1!A:Z';  // The range of your sheet (update this if your sheet has a different range)
+        const { Box, Button, Input, Text, Table, Thead, Tbody, Tr, Th, Td, Spinner } = window.Chakra;
 
-        function searchPhoneNumber() {
-            const phoneNumber = document.getElementById('phoneNumber').value.trim();
-            if (!phoneNumber) {
-                alert('Please enter a phone number!');
-                return;
-            }
+        function App() {
+            const [phoneNumber, setPhoneNumber] = React.useState("");
+            const [loading, setLoading] = React.useState(false);
+            const [results, setResults] = React.useState([]);
+            const [error, setError] = React.useState(null);
 
-            // Show loading message while fetching data
-            document.getElementById('loadingMessage').style.display = 'block';
+            const handleSearch = (e) => {
+                e.preventDefault();
+                setLoading(true);
+                setResults([]);
+                setError(null);
 
-            // Make API request to get data from Google Sheets
-            fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${RANGE}?key=${API_KEY}`)
-                .then(response => response.json())
-                .then(data => {
-                    const rows = data.values;
-                    const results = [];
-                    if (rows) {
-                        // Loop through the rows and check for the phone number
-                        rows.forEach(row => {
-                            if (row[2] && row[2].trim() === phoneNumber) {  // Assuming phone number is in the 3rd column (C)
-                                results.push(row);
+                // Google Sheets API URL (replace with your actual API key and Sheet ID)
+                const apiKey = 'AIzaSyCNqt-KUnlTgKP8FSpow_8ZXgdMmMX5QX4';  // Replace with your actual API key
+                const sheetId = '1VLljXHe4ZRTVhvGyPBp_149COUU0YxoVvDAXuFNkJ7U'; // Replace with your Sheet ID
+                const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/A:Z?key=${apiKey}`;
+
+                fetch(url)
+                    .then((response) => response.json())
+                    .then((data) => {
+                        const rows = data.values;
+                        const matchingRows = [];
+
+                        // Loop through rows to find matching phone number
+                        for (let i = 1; i < rows.length; i++) { // Skip header row
+                            const row = rows[i];
+                            const phoneInSheet = row[2]; // Assuming phone number is in the 3rd column (index 2)
+                            if (phoneInSheet && phoneInSheet.trim() === phoneNumber.trim()) {
+                                matchingRows.push(row);
                             }
-                        });
-                    }
+                        }
 
-                    // Hide loading message and show results
-                    document.getElementById('loadingMessage').style.display = 'none';
-                    document.getElementById('resultsTable').style.display = results.length ? 'table' : 'none';
+                        if (matchingRows.length === 0) {
+                            setError("No records found.");
+                        } else {
+                            setResults(matchingRows);
+                        }
 
-                    // Clear previous results
-                    const resultsBody = document.getElementById('resultsBody');
-                    resultsBody.innerHTML = '';
+                        setLoading(false);
+                    })
+                    .catch((err) => {
+                        setLoading(false);
+                        setError("Error fetching data from Google Sheets.");
+                    });
+            };
 
-                    if (results.length > 0) {
-                        // Populate table with search results
-                        results.forEach(row => {
-                            const tr = document.createElement('tr');
-                            row.forEach(cell => {
-                                const td = document.createElement('td');
-                                td.textContent = cell;
-                                tr.appendChild(td);
-                            });
-                            resultsBody.appendChild(tr);
-                        });
-                    } else {
-                        // Display no records found message if no match is found
-                        const tr = document.createElement('tr');
-                        const td = document.createElement('td');
-                        td.colSpan = 13;
-                        td.textContent = 'No records found';
-                        tr.appendChild(td);
-                        resultsBody.appendChild(tr);
-                    }
-                })
-                .catch(error => {
-                    document.getElementById('loadingMessage').style.display = 'none';
-                    alert('Error fetching data: ' + error);
-                });
+            return (
+                <Box maxWidth="800px" margin="auto" padding="20px">
+                    <Text fontSize="2xl" marginBottom="20px">Search Phone Number</Text>
+
+                    <form onSubmit={handleSearch}>
+                        <Box marginBottom="20px">
+                            <Input
+                                value={phoneNumber}
+                                onChange={(e) => setPhoneNumber(e.target.value)}
+                                placeholder="Enter phone number"
+                                size="lg"
+                                required
+                            />
+                        </Box>
+                        <Button type="submit" colorScheme="teal" size="lg">Search</Button>
+                    </form>
+
+                    {loading && (
+                        <Box textAlign="center" marginTop="20px">
+                            <Spinner size="lg" />
+                        </Box>
+                    )}
+
+                    {error && !loading && (
+                        <Text color="red.500" marginTop="20px">{error}</Text>
+                    )}
+
+                    {results.length > 0 && !loading && (
+                        <Box marginTop="30px" className="result-panel">
+                            <Table variant="simple">
+                                <Thead>
+                                    <Tr>
+                                        <Th>Ticket ID</Th>
+                                        <Th>User ID</Th>
+                                        <Th>Mobile Phone</Th>
+                                        <Th>Lender ID</Th>
+                                        <Th>Lender Name</Th>
+                                        <Th>Payout Amount</Th>
+                                        <Th>Payout Date</Th>
+                                        <Th>Beneficiary Account Name</Th>
+                                        <Th>Beneficiary Account Number</Th>
+                                        <Th>IFSC Code</Th>
+                                        <Th>Remark</Th>
+                                        <Th>UTR's New</Th>
+                                        <Th>FD Status</Th>
+                                        <Th>Reason</Th>
+                                    </Tr>
+                                </Thead>
+                                <Tbody>
+                                    {results.map((row, index) => (
+                                        <Tr key={index}>
+                                            {row.map((cell, i) => (
+                                                <Td key={i}>{cell}</Td>
+                                            ))}
+                                        </Tr>
+                                    ))}
+                                </Tbody>
+                            </Table>
+                        </Box>
+                    )}
+                </Box>
+            );
         }
+
+        // Render the app
+        ReactDOM.render(<App />, document.getElementById("app"));
     </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/react@18.0.0/umd/react.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18.0.0/umd/react-dom.production.min.js"></script>
 
 </body>
 </html>
